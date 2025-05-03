@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: 'aktiv-grotesk-thin';
+  src: url('./fonts/aktivGrotesk-Thin.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'aktiv-grotesk-regular';
+  src: url('./fonts/aktivGrotesk-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'aktiv-grotesk-medium';
+  src: url('./fonts/aktivGrotesk-Medium.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'aktiv-grotesk-light';
+  src: url('./fonts/aktivGrotesk-Light.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'aktiv-grotesk-bold';
+  src: url('./fonts/aktivGrotesk-Bold.ttf') format('truetype');
+}
+
+body {
+  @apply font-aktivMedium text-sm;
+}
+
+.modeRotate {
+    @apply rotate-180
+}
+
+.cls-1,
+.cls-2,
+.cls-3 {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 5px;
+}
+
+.cls-1 {
+  stroke: #262626;
+}
+
+.cls-1,
+.cls-2 {
+  fill-rule: evenodd;
+}
+
+.cls-2,
+.cls-3 {
+  stroke: #e6e6e6;
+}
