@@ -28,7 +28,7 @@ export const MainStore = defineStore("main", {
     getExtracted(state){
       return state.extractedData
     },
-    getOptoinInfo(state){
+    getOptionInfo(state){
       return state.optionInfo
     }
   },
@@ -44,7 +44,6 @@ export const MainStore = defineStore("main", {
       this.combinedFinalData = {};
       this.optionInfo.prodi = p;
       this.optionInfo.year = y;
-      console.log("optionInfo : ", this.optionInfo)
 
       //check if data already exist
       if(p === "all"){
@@ -154,8 +153,7 @@ export const MainStore = defineStore("main", {
       const extract = extractInfo();
       const extracted = await extract.startExtracting(this.combinedFinalData, p);
       this.extractedData = extracted;
-      console.log("extracted : ", this.extractedData)
-
+      console.log("this.dataPreprocessing: ", this.dataPreprocessing);
 
       this.loading.status = true;
 

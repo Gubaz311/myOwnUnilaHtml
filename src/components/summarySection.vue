@@ -105,11 +105,6 @@ const bestCatInfo = computed(() => {
   const bestCatScoreIPK = extracted.value.bestCat.bestAvgGPA.score;
   const bestCatValueDuration = extracted.value.bestCat.bestAvgDuration.value; 
   const bestCatScoreDuration = extracted.value.bestCat.bestAvgDuration.score;
-  console.log("bestcatlabel", bestCatLabel);
-  console.log("bestcatvalueIPK", bestCatValueIPK);
-  console.log("bestcatScoreIPK", bestCatScoreIPK); 
-  console.log("bestcatvalueDuration", bestCatValueDuration);
-  console.log("bestcatScoreDuration", bestCatScoreDuration);
 
   return {
     bestCatLabel,

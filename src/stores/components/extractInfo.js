@@ -69,47 +69,57 @@ export const extractInfo = defineStore("extractInfo", {
     },
     async avgCat(data, p) {
       const result = {};
+    
+      const isValidEntry = (entry) => {
+        const masuk = new Date(entry.tglMasuk);
+        const keluar = new Date(entry.tglKeluar);
+        return keluar >= masuk;
+      };
+    
       if (p === "all") {
         const grouped = {};
     
         for (const [key, arr] of Object.entries(data)) {
-          const code = key.split("-")[0]; // Ambil kode prodi
+          const code = key.split("-")[0];
           if (!grouped[code]) grouped[code] = [];
-          grouped[code].push(...arr); // Gabungkan data dari tahun-tahun berbeda
+          grouped[code].push(...arr);
         }
     
         for (const [code, arr] of Object.entries(grouped)) {
-          if (!arr.length) continue;
+          const valid = arr.filter(isValidEntry);
+          if (!valid.length) continue;
     
-          const sumGPA = arr.reduce((sum, d) => sum + parseFloat(d.ipk), 0);
-          const sumDur = arr.reduce((sum, d) => sum + parseFloat(d.durasi), 0);
-          const prodiName = arr[0].prodi;
+          const sumGPA = valid.reduce((sum, d) => sum + parseFloat(d.ipk), 0);
+          const sumDur = valid.reduce((sum, d) => sum + parseFloat(d.durasi), 0);
+          const prodiName = valid[0].prodi;
     
           result[code] = {
             category: prodiName,
-            avgGPA: (sumGPA / arr.length).toFixed(2),
-            avgDuration: (sumDur / arr.length).toFixed(1)
+            avgGPA: (sumGPA / valid.length).toFixed(2),
+            avgDuration: (sumDur / valid.length).toFixed(1)
           };
         }
-    
       } else {
         for (const [key, arr] of Object.entries(data)) {
-          if (!arr.length) continue;
+          const valid = arr.filter(isValidEntry);
+          if (!valid.length) continue;
     
           const year = key.split("-")[1];
-          const sumGPA = arr.reduce((sum, d) => sum + parseFloat(d.ipk), 0);
-          const sumDur = arr.reduce((sum, d) => sum + parseFloat(d.durasi), 0);
-          const prodiName = arr[0].prodi;
+          const sumGPA = valid.reduce((sum, d) => sum + parseFloat(d.ipk), 0);
+          const sumDur = valid.reduce((sum, d) => sum + parseFloat(d.durasi), 0);
+          const prodiName = valid[0].prodi;
     
           result[year] = {
             category: prodiName,
-            avgGPA: (sumGPA / arr.length).toFixed(2),
-            avgDuration: (sumDur / arr.length).toFixed(1)
+            avgGPA: (sumGPA / valid.length).toFixed(2),
+            avgDuration: (sumDur / valid.length).toFixed(1)
           };
         }
       }
+    
       return result;
     },
+    
     async  maxStats(data) {
       const flattened = Object.values(data).flat();
     
