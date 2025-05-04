@@ -4,7 +4,6 @@ export const extractInfo = defineStore("extractInfo", {
     data: [],
     extractedData : {},
     prodi: null,
-    avgCat:{},
     jalurMasukMap: JSON.parse(import.meta.env.VITE_JALUR_MASUK),
     tablesToReplace: JSON.parse(import.meta.env.VITE_TABLES_TO_REPLACE),
     prodiMap: JSON.parse(import.meta.env.VITE_PRODI),
@@ -25,7 +24,7 @@ export const extractInfo = defineStore("extractInfo", {
       this.extractedData.avgAll = await this.avgAll(data);
       this.extractedData.avgCat = await this.avgCat(data, p);
       this.extractedData.maxStats = await this.maxStats(data);
-      this.extractedData.bestCat = await this.bestCat();
+      this.extractedData.bestCat = await this.bestCat(this.extractedData.avgCat, p);
 
       return this.extractedData;
     },
@@ -70,7 +69,6 @@ export const extractInfo = defineStore("extractInfo", {
     },
     async avgCat(data, p) {
       const result = {};
-      this.avgCat = {};
       if (p === "all") {
         const grouped = {};
     
@@ -110,7 +108,6 @@ export const extractInfo = defineStore("extractInfo", {
           };
         }
       }
-      this.avgCat = result;
       return result;
     },
     async  maxStats(data) {
@@ -149,8 +146,15 @@ export const extractInfo = defineStore("extractInfo", {
         },
       };
     },
-    async bestCat() {
-      const cat = this.avgCat;
+    async bestCat(data, p) {
+      const cat = data;
+    
+      if (!cat || Object.keys(cat).length === 0) {
+        return {
+          bestAvgGPA: { label: "-", value: "-", score: "N/A" },
+          bestAvgDuration: { label: "-", value: "-", score: "N/A" }
+        };
+      }
     
       let bestGPA = { key: null, value: -Infinity };
       let bestDuration = { key: null, value: Infinity };
@@ -168,22 +172,31 @@ export const extractInfo = defineStore("extractInfo", {
         }
       }
     
-        // Ambil nama prodi dari category
-      const bestGPAProdi = cat[bestGPA.key]?.category || bestGPA.key;
-      const bestDurationProdi = cat[bestDuration.key]?.category || bestDuration.key;
-
+      // Untuk p === 'all', ambil nama prodi dari category
+      // Untuk selain 'all', pakai tahun (key)
+      const bestGPAValue = p === "all" 
+        ? cat[bestGPA.key]?.category || bestGPA.key 
+        : bestGPA.key;
+    
+      const bestDurationValue = p === "all" 
+        ? cat[bestDuration.key]?.category || bestDuration.key 
+        : bestDuration.key;
+    
+      const label = p === "all" ? "Prodi" : "Tahun";
+    
       return {
         bestAvgGPA: {
-          prodi: bestGPAProdi,
-          value: bestGPA.value.toFixed(2)
+          label,
+          value: bestGPAValue,
+          score: bestGPA.value.toFixed(2)
         },
         bestAvgDuration: {
-          prodi: bestDurationProdi,
-          value: bestDuration.value.toFixed(1)
+          label,
+          value: bestDurationValue,
+          score: bestDuration.value.toFixed(1)
         }
       };
-    }
-    
+    },
     
   },
 });

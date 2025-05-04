@@ -1,7 +1,7 @@
 <template>
-<header id="header" class="font-aktivMedium max-h-50 bg-lightHeader/75 text-lightText shadow-md rounded-sm z-10 p-1 sticky top-0 w-full dark:bg-darkHeader/75 dark:text-darkText">
+<header id="header" class="font-aktivMedium bg-lightHeader/75 text-lightText shadow-md rounded-sm z-10 p-1 sticky top-0 w-full dark:bg-darkHeader/75 dark:text-darkText">
     <!-- Baris Pertama -->
-    <div id="baris1" class="h-12 md:h-1/2 md:min-h-16 w-full flex justify-between items-center py-3">
+    <div id="baris1" class="h-14 w-full flex justify-between items-center py-3">
       <div class="flex py-0 relative">
         <div class="h-full content-center hidden md:block md:mx-3">
           <div class="h-14 w-14 mb-2"> <!--YANG INI-->
@@ -127,7 +127,7 @@
     </div>
     <!-- Baris Kedua -->
     <div id="baris2"
-      class="border-t-4 border-y-lightText h-1/2 min-h-14 items-center px-4 space-x-5 content-center hidden md:flex dark:border-y-darkText transition duration-1000 leading-4 md:leading-7">
+      class="border-t-4 h-10 border-y-lightText items-center px-4 space-x-5 content-center hidden md:flex dark:border-y-darkText transition duration-1000 leading-4 md:leading-7">
       <!--div a-->
       <span class="h-10 rounded flex items-center">
         <span class="flex items-center">

@@ -1,13 +1,18 @@
 <template>
-  <MainHeader class="overflow-hidden"/>
-  <main class="bg-lightMain dark:bg-darkMain">
-    <ktwView/>
+  <div class="relative z-10">
+    <main class="bg-lightMain dark:bg-darkMain relative min-h-screen">
+    <noiseBackground/>
+    <MainHeader class="overflow-hidden z-30"/>
+    <OptionButton/>
     <div v-if="store.loading.status === true">
+        <ktwView/>
     </div>
     <div v-else>
-      <LoadingView/>
+        <LoadingView/>
     </div>
   </main>
+  </div>
+<div>ASDASDASD</div>
   <div>Lorem ipsum dolor sit amet, consectetur adipisicing elit. Mollitia doloremque atque, quibusdam repudiandae voluptatem velit blanditiis suscipit, ducimus provident, magni facilis possimus exercitationem vel natus in facere eligendi? Nostrum, possimus.
   Magnam, dolorem. Obcaecati esse iure expedita beatae laudantium tempora. Alias facilis deleniti dolorum, veritatis iste tempore consectetur molestias quo provident, cupiditate odio quas? Explicabo totam, alias maxime laborum culpa similique?
   Earum debitis velit totam placeat ipsam recusandae, nisi veniam ea tempore similique repellendus a cumque modi? Recusandae voluptates, aspernatur tempora libero minus perspiciatis culpa sed excepturi itaque. Corrupti, incidunt cum.
@@ -112,11 +117,13 @@
 </template>
 
 <script setup>
+import noiseBackground from './components/icons/noiseBackground.vue';
 import MainHeader from './components/mainHeader.vue';
 import mainFooter from './components/mainFooter.vue';
 import ktwView from './views/ktwView.vue';
 import { MainStore } from './stores/mainStore';
 import LoadingView from './components/loadingView.vue';
+import OptionButton from './components/optionButton.vue';
 const store = MainStore();
 </script>
 

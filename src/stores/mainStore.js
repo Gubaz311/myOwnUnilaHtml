@@ -10,12 +10,13 @@ export const MainStore = defineStore("main", {
     dataraw:[],
     dataPreprocessing:[],
     combinedFinalData: {},
-    prodi: null,
+    optionInfo: {},
     memory: [],
     loading:{
       status:false,
       content:null,
     },
+    extractedData: {},
   }),
   getters:{
     getTeksLoading(state){
@@ -23,6 +24,12 @@ export const MainStore = defineStore("main", {
     },
     getThemeColor(state){
       return state.theme === 'dark' ? '#F3F4F6' : '#111827';
+    },
+    getExtracted(state){
+      return state.extractedData
+    },
+    getOptoinInfo(state){
+      return state.optionInfo
     }
   },
   actions:{
@@ -35,6 +42,9 @@ export const MainStore = defineStore("main", {
       const preProcessing = PreProcessing();
       this.loading.status = false;
       this.combinedFinalData = {};
+      this.optionInfo.prodi = p;
+      this.optionInfo.year = y;
+      console.log("optionInfo : ", this.optionInfo)
 
       //check if data already exist
       if(p === "all"){
@@ -141,11 +151,10 @@ export const MainStore = defineStore("main", {
           this.combinedFinalData[key]= this.dataPreprocessing[key];
         }
       }
-      console.log("this.dataPreprocessing :", this.dataPreprocessing)
-      console.log("this.combinedFinalData :", this.combinedFinalData)
       const extract = extractInfo();
       const extracted = await extract.startExtracting(this.combinedFinalData, p);
-      console.log("extracted : ", extracted)
+      this.extractedData = extracted;
+      console.log("extracted : ", this.extractedData)
 
 
       this.loading.status = true;
