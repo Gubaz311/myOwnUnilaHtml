@@ -1,51 +1,109 @@
-# myOwnUnila
+# Prediksi Kelulusan Tepat Waktu Mahasiswa (KTW)  
+Skripsi - Sistem Prediksi KTW Berbasis Vue.js dan TensorFlow.js
 
-This template should help get you started developing with Vue 3 in Vite.
+## 📖 Deskripsi
 
-## Recommended IDE Setup
+Skripsi ini bertujuan untuk membangun sistem prediksi **Kelulusan Tepat Waktu (KTW)** mahasiswa berdasarkan data akademik dan status studi. Sistem ini dikembangkan menggunakan **Vue.js** sebagai frontend dan **TensorFlow.js** sebagai library machine learning di sisi client (browser).
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+Sistem dapat melakukan pelatihan model (training), validasi, pengujian, dan inferensi secara langsung di browser tanpa server eksternal. Diharapkan sistem ini dapat membantu institusi pendidikan dalam menganalisis risiko keterlambatan kelulusan mahasiswa secara otomatis.
 
-## Customize configuration
+---
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+## 🚀 Fitur Utama
 
-## Project Setup
+- Input data mahasiswa per semester (IPK, SKS, status)
+- Preprocessing data otomatis (normalisasi, encoding, penghapusan outlier)
+- Training model machine learning di browser menggunakan TensorFlow.js
+- Menyimpan dan memuat model yang telah dilatih
+- Prediksi kelulusan tepat waktu secara real-time
+- Visualisasi loss dan akurasi selama proses pelatihan
 
-```sh
+---
+
+## 🛠 Teknologi
+
+- **Vue.js** – Framework frontend JavaScript
+- **Vite** – Build tool modern untuk Vue
+- **Pinia** – State management pengganti Vuex
+- **TensorFlow.js** – Library machine learning berbasis JavaScript
+- **JavaScript (ES6+)** – Bahasa utama pengembangan
+
+---
+
+## 📁 Struktur Folder
+
+src/
+├── assets/ # Asset statis (gambar, ikon, dll)
+├── components/ # Komponen UI Vue
+├── models/ # Kode terkait model ML
+│ ├── preprocessing.js # Pra-pemrosesan data
+│ ├── modelBuilder.js # Arsitektur model
+│ └── trainer.js # Logika pelatihan
+├── stores/ # Store Pinia untuk data global
+├── views/ # Halaman Vue (UI utama)
+├── App.vue # Komponen root
+├── main.js # Entry point aplikasi
+.env # Variabel environment
+
+---
+
+## ⚙️ Cara Menjalankan Aplikasi
+
+1. **Clone repositori:**
+   ```bash
+   git clone https://github.com/username/proyek-prediksi-ktw.git
+   cd proyek-prediksi-ktw
+
+2. **Instal Depedensi**
 npm install
-```
 
-### Compile and Hot-Reload for Development
-
-```sh
+3. **Jalankan server pengembangan**
 npm run dev
-```
 
-### Compile and Minify for Production
+4. **Akses Aplikasi**
+http://localhost:5173
 
-```sh
-npm run build
-```
+🧠 Alur Proses
+Input Data Mahasiswa
+Input terdiri dari data per semester:
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+IPK
 
-```sh
-npm run test:unit
-```
+Total SKS
 
-### Lint with [ESLint](https://eslint.org/)
+Status aktif (AK), cuti (CT), tidak aktif (TA)
 
-```sh
-npm run lint
-```
+Angkatan, prodi, dan atribut lain
 
-# MyOwnUnila_html
-continue from https://github.com/Gubaz311/myOwnUnila_server , front-end
+Pra-pemrosesan
 
-first clone -->
-npm install
+Menyelesaikan missing value
 
-to run tailwind -> npm run tailwind
+Menghapus outlier menggunakan metode IQR
 
-to run program -> npm run dev
+Melakukan one-hot encoding dan normalisasi
+
+Mengelompokkan berdasarkan angkatan
+
+Pelatihan Model
+
+Model neural network dibangun dengan TensorFlow.js
+
+Lapisan: Dense, Dropout, Aktivasi ReLU/Sigmoid
+
+Callback: EarlyStopping, ReduceLROnPlateau
+
+Data dibagi: 80% training, 10% validasi, 10% testing
+
+Evaluasi & Prediksi
+
+Menampilkan akurasi, val_loss, dan confusion matrix
+
+Prediksi KTW untuk mahasiswa baru berdasarkan data historis
+
+
+Skripsi ini dibuat untuk keperluan akademik. Anda bebas menggunakan atau memodifikasi proyek ini untuk pembelajaran atau penelitian dengan tetap mencantumkan atribusi yang sesuai.
+
+---
+
+Kalau kamu ingin saya menambahkan nama, institusi, atau link demo (jika ada), tinggal beri tahu. Saya juga bisa bantu buat versi Bahasa Inggris jika dibutuhkan untuk publikasi atau presentasi internasional.
