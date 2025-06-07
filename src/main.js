@@ -1,19 +1,27 @@
 import './assets/main.css'
 import { createPinia } from 'pinia'
 
-
 import { createApp } from 'vue'
 import App from './App.vue'
-import { MainStore } from './stores/mainStore'
+import router from './router'
 import HighchartsVue from 'highcharts-vue'
+import { MainStore } from './stores/mainStore'
+import { ModelStore } from './stores/components/modelStore'
 
 const pinia = createPinia()
 const app = createApp(App)
 
 app.use(pinia)
 app.use(HighchartsVue)
+app.use(router)
 app.mount('#app')
 
-//debugging
-const mainStore = MainStore()
-window.mainStore = mainStore;
+
+// Console function
+
+const store = MainStore();
+window.start = store.gotoReport; 
+//store.gotoReport() isinya store.currentView = report
+
+const model = ModelStore();
+window.coba = model.buYessi;

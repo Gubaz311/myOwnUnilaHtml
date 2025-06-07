@@ -1,5 +1,5 @@
 <template>
-    <div ref="chartContainer" class="h-44 md:h-72 w-full"></div>
+    <div ref="chartContainer" class="h-44 md:h-96 w-full"></div>
 </template>
   
 <script setup>
@@ -65,7 +65,6 @@
         enabled: false
       }
     })
-    console.log("X Categories", props)
   }
   
   onMounted(() => {

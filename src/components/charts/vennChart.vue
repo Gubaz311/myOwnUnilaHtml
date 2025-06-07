@@ -22,7 +22,6 @@ const renderChart = () => {
 
   const store = MainStore()
   const extractedData = ref(store.getExtracted)
-  console.log('extractedData', extractedData.value)
 
 
   chartInstance = Highcharts.chart(chartContainer.value, {

@@ -32,7 +32,7 @@
       <div class="col-span-1 md:col-span-2 md:row-span-2 md:col-start-4 md:row-start-3">
         <div class="flex flex-col space-y-2 md:pt-4 mb-1">
           <div class="flex justify-center">
-            <podiumLogo class="h-12 md:h-16"/>
+            <podiumLogo class="h-12 md:h-[3.75rem]"/>
           </div>
         </div>
         <div class="text-center">{{ bestCatInfo.bestCatLabel }} dengan IPK Terbaik</div>
@@ -90,6 +90,7 @@ const avgDurasi = ref(extracted.value.avgAll.avgDuration);
 const bestIPK = ref(extracted.value.maxStats.highestGPA.value);
 const totalBestIPK = ref(extracted.value.maxStats.highestGPA.count);
 
+
 // const bestCat = computed(() => {
 //   return optionInfo.value.prodi === 'all' ? "Prodi" : "Tahun";
 // });
@@ -100,7 +101,7 @@ const totalBestIPK = ref(extracted.value.maxStats.highestGPA.count);
 //   return ref(extracted.value.bestCat.bestAvgDuration.value);
 // })
 const bestCatInfo = computed(() => {
-  const bestCatLabel = optionInfo.value.prodi === 'all' ? "Prodi" : "Tahun";
+  const bestCatLabel = extracted.value.bestCat.bestAvgGPA.label;
   const bestCatValueIPK = extracted.value.bestCat.bestAvgGPA.value;
   const bestCatScoreIPK = extracted.value.bestCat.bestAvgGPA.score;
   const bestCatValueDuration = extracted.value.bestCat.bestAvgDuration.value; 

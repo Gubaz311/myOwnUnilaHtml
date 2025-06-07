@@ -3,11 +3,6 @@ import { defineStore } from "pinia";
 
 export const FetchData = defineStore("FetchData", {
     state:() =>({
-        data:[],
-        memory:{
-            prodi: "",
-            year: ""
-        },
         config:{
             url:import.meta.env.VITE_BASE_URL,
         },

@@ -23,7 +23,7 @@ export default {
         lightContainer: 'rgba(234, 234, 225, 1) ',
         lightText: 'rgba(31, 41, 55, 1)',
         lightIcon: 'rgba(34, 37, 42, 1)',
-        lightIconFocus: 'rgba(96, 165, 250, 1)',
+        lightIconFocus: 'rgba(2, 132, 199, 1)',
         lightFooter : 'rgba(165, 180, 252, 1)',
 
         darkHeader:'rgba(22, 17, 78, 1)',

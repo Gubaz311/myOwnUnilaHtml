@@ -1,168 +1,124 @@
 import { defineStore } from "pinia";
 export const PreProcessing = defineStore("preProcessing", {
     state:()=>({
+      dataToDelete:import.meta.env.VITE_DATA_TO_DELETE,
       tablesToReplace: JSON.parse(import.meta.env.VITE_TABLES_TO_REPLACE),
       prodiMap: JSON.parse(import.meta.env.VITE_PRODI),
       unknownValues: JSON.parse(import.meta.env.VITE_UNKNOWN_VALUES || '{}'),
       jalurMasukMap: JSON.parse(import.meta.env.VITE_JALUR_MASUK),
+      columnsToCut: import.meta.env.VITE_COLUMNS_TO_CUT,
     }),
     getters:{
-      async findDuration(tglMasuk, tglKeluar) {
-        const masukDate = new Date(tglMasuk);
-        const keluarDate = new Date(tglKeluar);
-    
-        // Hitung selisih dalam tahun dan bulan
-        let yearDiff = keluarDate.getFullYear() - masukDate.getFullYear();
-        let monthDiff = keluarDate.getMonth() - masukDate.getMonth();
-    
-        // Jika bulan di tglMasuk lebih besar dari bulan di tglKeluar, kurangi 1 tahun dan sesuaikan bulan
-        if (monthDiff < 0) {
-            yearDiff--;
-            monthDiff += 12;
-        }
-
-            // Hitung tahun dalam format desimal
-        let totalYears = yearDiff + (monthDiff / 12);
-
-        if (monthDiff === 0) {
-          return `${yearDiff} tahun`;
-        } else {
-            // Bulatkan ke 1 angka desimal
-            return `${totalYears.toFixed(1)} tahun`;
-        }
-    }
     },
     actions:{
-      async startPreprocessing(data, p){
-        const cut = await this.cutColumn(data);
-        const clean = await this.cleaningData(cut);
+      async getSemesterNumber(str) {
+        const year = parseInt(str);
+        const isGenap = str.toLowerCase().includes("genap");
+        return (year - 2000) * 2 + (isGenap ? 1 : 0);
+      },
+      async roundToNearestHalf(num) {
+        return Math.round(num * 2) / 2;
+      },
+      async startPreprocessing(data){
+        const clean = await this.cleaningData(data);
         const extractInfo = await this.extractInfo(clean);
-        const finalData = await this.categorized(extractInfo, p)
-        return finalData;
+        const cut = await this.cutColumn(extractInfo);
+        return cut;
+      },
+      async cleaningData(data){
+        const dataToDelete = this.dataToDelete.split(",");
+        //handle other than S1 data
+        const onlyS1Students = data.filter((student) => {
+          const jalurMasuk = (student.jalurMasuk || "").toLowerCase();
+          const jalurPenerimaan = (student.jalurPenerimaan || "").toLowerCase();
+          const namaProdi = (student.namaProdi || "").toLowerCase();
+          
+          const combined =`${jalurMasuk} ${jalurPenerimaan} ${namaProdi}`;
+          return !dataToDelete.some((dataToDelete) => combined.includes(dataToDelete));
+        })
+
+        //handle duplicate by npm
+        const seenNPM = new Set();
+        const uniqueData = onlyS1Students.filter((student) => {
+          const duplicate = seenNPM.has(student.npm);
+          seenNPM.add(student.npm);
+          return !duplicate;
+        });
+        
+        //handle missing fakultas and namaProdi
+        const prodiMap = new Map()
+        uniqueData.forEach((student) => {
+          const npm = student.npm;
+          const kode = npm.substring(3, 7);
+          const namaProdi = student.namaProdi?.trim();
+          const fakultas = student.fakultas?.trim();
+
+          if (namaProdi && fakultas){
+            prodiMap.set(kode, { namaProdi, fakultas });
+          }
+        })
+
+        const filledStudents = uniqueData.map((student) =>{
+          const npm = student.npm;
+          const kode = npm.substring(3, 7);
+          const ref = prodiMap.get(kode);
+
+          return {
+            ...student,
+            namaProdi: ref ? ref.namaProdi : student.namaProdi,
+            fakultas: ref ? ref.fakultas : student.fakultas,
+          }
+        })
+
+        // Handle null student.angkatan value
+        filledStudents.map((student) => {
+          if (!student.angkatan){
+            const npm = student.npm
+            const angkatanCode = npm.slic(0,2);
+            if (parseInt(angkatanCode)<10){
+              student.angkatan = `200${angkatanCode}`;
+            }else{
+              student.angkatan = `20${angkatanCode}`;
+            }
+          }
+        })
+
+        // Handle null student.jalurPenerimaan value
+        let jalurMap = {};
+        filledStudents.forEach(s => {
+          if (s.jalurPenerimaan && !jalurMap[s.kodeProdi]) {
+            jalurMap[s.kodeProdi] = s.jalurPenerimaan;
+          }
+        });
+
+        // Isi jalurPenerimaan yang kosong berdasarkan mapping
+        filledStudents.forEach(student => {
+          if (!student.jalurPenerimaan || student.jalurPenerimaan.trim() === "") {
+            student.jalurPenerimaan = jalurMap[student.kodeProdi] || "tidak diketahui";
+          }
+        });
+        return filledStudents;
+      },
+      async extractInfo(data){
+        for (const student of data) {
+          const semesterAwal = await this.getSemesterNumber(student.angkatan);
+          const semesterAkhir = await this.getSemesterNumber(student.semesterTerakhir);
+          const durasi = Number(await this.roundToNearestHalf((semesterAkhir - semesterAwal)/2));
+          student.durasi = parseFloat(durasi.toFixed(1));
+        }
+        return data;
       },
       async cutColumn(data){
-        const columnsToCut = import.meta.env.VITE_COLUMNS_TO_CUT.split(',');
+        const columnsToCut = this.columnsToCut.split(",");
         const result = data.map((student) => {
           columnsToCut.forEach((col) => {
-            delete student[col];
+            if (col in student) {
+              delete student[col];
+            }
           });
           return student;
         });
         return result;
       },
-      async cleaningData(data){
-        //handle duplicate by npm
-        const seenNPM = new Set();
-        const uniqueData = data.filter((student) => {
-          const duplicate = seenNPM.has(student.npm);
-          seenNPM.add(student.npm);
-          return !duplicate;
-        });
-        // return uniqueData;
-
-        // Handle kolom kosong dengan nilai default
-        const tablesToReplace = this.tablesToReplace;
-        const emptyField = uniqueData.map((student) => {
-          // Tangani tiap kolom secara spesifik
-          Object.keys(student).forEach((key) => {
-            if (student[key] === "" || student[key] === undefined || student[key] === null) {
-                // Jika key ada di tabel replacement, gunakan nilai yang didefinisikan
-                if (tablesToReplace[key]) {
-                    student[key] = tablesToReplace[key];
-                } else {
-                    // Jika tidak ada, gunakan nilai default
-                    student[key] = tablesToReplace.default || null;
-                }
-            }
-          });
-          return student;
-        });
-
-        return emptyField;
-      },
-      async extractInfo(data){
-        //extract NPM
-        data.map((student) => {
-          const npm = student.npm;
-
-          // Ekstraksi 2 digit pertama untuk angkatan
-          const angkatanCode = npm.slice(0, 2);
-          let angkatan;
-          
-          if (parseInt(angkatanCode) < 10) {
-              angkatan = `200${angkatanCode}`; // Angkatan sebelum 2010
-          } else {
-              angkatan = `20${angkatanCode}`;  // Angkatan setelah 2010
-          }
-          student.angkatan = angkatan;
-
-          // Ekstraksi 2 digit berikutnya untuk jalur masuk
-          const jalurMasukCode = npm.slice(2, 4);
-          const jalurMasuk = this.jalurMasukMap[jalurMasukCode] || this.unknownValues.jalur;
-          student.jalurMasuk = jalurMasuk;
-
-          // Ekstraksi 3 digit setelahnya untuk kode prodi
-          const prodiCode = npm.slice(4, 7);
-          const prodi = this.prodiMap[prodiCode] || this.unknownValues.prodi;
-          student.prodi = prodi;
-
-          // Mengambil tanggal tanpa timestamp (YYYY-MM-DD)
-          const tglMasuk = student.tglMasuk.split('T')[0];
-          student.tglMasuk = tglMasuk;
-          const tglKeluar = student.tglKeluar ? student.tglKeluar.split('T')[0] : null;
-          student.tglKeluar = tglKeluar;
-
-          // Hitung durasi 
-          const masukDate = new Date(tglMasuk);
-          const keluarDate = tglKeluar ? new Date(tglKeluar) : null;
-          let durasi = null;
-          if (masukDate && keluarDate && keluarDate >= masukDate) {
-              // Hitung selisih dalam tahun dan bulan
-              let yearDiff = keluarDate.getFullYear() - masukDate.getFullYear();
-              let monthDiff = keluarDate.getMonth() - masukDate.getMonth();
-              
-              // Jika bulan di tglMasuk lebih besar dari bulan di tglKeluar, kurangi 1 tahun dan sesuaikan bulan
-              if (monthDiff < 0) {
-                  yearDiff--;
-                  monthDiff += 12;
-              }
-              // Hitung tahun dalam format desimal
-              let totalYears = yearDiff + (monthDiff / 12);
-                  // Bulatkan ke 0 atau 0.5 terdekat
-              durasi = Math.floor(totalYears) + (totalYears % 1 >= 0.5 ? 0.5 : 0);
-          }
-          student.durasi = durasi;
-
-        });
-        data.forEach((student) => {
-          delete student.npm;
-        })
-        return data;
-      },
-      async categorized(data, p){
-        let finalData ={};
-        if (p === "all"){
-          data.forEach((student) => {
-            let fakultas = student.prodi;
-            if (!Object.prototype.hasOwnProperty.call(finalData, fakultas)) {
-              finalData[fakultas] = [];
-            }
-            finalData[fakultas].push(student);
-          });
-        } else {
-          data.forEach((student) => {
-            let tahunMasuk = new Date(student.tglMasuk)
-              .getFullYear()
-              .toString();
-            if (!Object.prototype.hasOwnProperty.call(finalData, tahunMasuk)) {
-              finalData[tahunMasuk] = [];
-            }
-            finalData[tahunMasuk].push(student);
-          });
-          this.fakultas = false;
-        }
-        return finalData;
-      },
-//HELPER CODE
     },
 })
