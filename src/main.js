@@ -6,7 +6,6 @@ import App from './App.vue'
 import router from './router'
 import HighchartsVue from 'highcharts-vue'
 import { MainStore } from './stores/mainStore'
-import { ModelStore } from './stores/components/modelStore'
 
 const pinia = createPinia()
 const app = createApp(App)
@@ -23,5 +22,6 @@ const store = MainStore();
 window.start = store.gotoReport; 
 //store.gotoReport() isinya store.currentView = report
 
-const model = ModelStore();
-window.coba = model.buYessi;
+// import { ModelStore } from './stores/components/modelStore'
+// const model = ModelStore();
+// window.coba = model.buYessi;

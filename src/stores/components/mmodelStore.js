@@ -1,17 +1,20 @@
 import * as tf from '@tensorflow/tfjs'
 import { MainStore } from '../mainStore';
 import { defineStore } from 'pinia';
-import { extractInfo } from './extractInfo';
 import { toRaw } from 'vue';
 import '@tensorflow/tfjs-backend-webgpu';
 import '@tensorflow/tfjs-backend-wasm';
+import { get, set } from 'idb-keyval';
+import { HelperCode } from '../helperCode';
 
 export const MModelStore = defineStore('mmodelStore', {
     state:() =>({
         totalDataStep:{},
+        testingData:{},
         dataMaps:{},
         model:null,
         modelAvailable:false,
+        isTrained:false,
         data:{},
         prodi:null,
         encodeMaps:{},
@@ -44,7 +47,9 @@ export const MModelStore = defineStore('mmodelStore', {
     },
     actions:{
         async startInitial(backend, learningCurve, patienceCount, neuron, sumHidden){
+            console.log("Startinitial")
             const store = MainStore();
+            const helper = HelperCode();
             store.loading.status = false;
 
             // Rebooting memory
@@ -56,11 +61,6 @@ export const MModelStore = defineStore('mmodelStore', {
             this.tensorOutput = {};
             this.tensorData = {};
             this.testingSummary = {};
-
-            // Will be deleted in the future
-            this.model = null;
-
-            store.gotoReport();
 
             // Config backend tensorflow
             await tf.setBackend(backend);
@@ -80,45 +80,54 @@ export const MModelStore = defineStore('mmodelStore', {
             // Get data
             await this.completingMissingData(); 
             this.data = store.getDataPreprocessing;
-            store.loading.status = false
+            store.loading.status = false;
 
             // Optimizing data
-            this.totalDataStep.getData = {};
             store.loading.content = `Optimizing Data`;
-            const extract = extractInfo();
-            const flatten = await extract.flattenData(this.data, "all");
+            this.totalDataStep.getData = {};
+            const flatten = await helper.flattenData(this.data, "all");
             const rawFlatten = flatten.map(item => toRaw(item));
             this.totalDataStep.getData.after = rawFlatten.length;
             this.totalDataStep.getData.features = this.getTotalFeature(rawFlatten);
 
             // Filter data outliers
             const cleanedData = await this.cleanOutliers(rawFlatten);
-            
-            // Build encode maps
+
+            // generate encodeMaps
             this.encodeMaps = await this.encodeMapsbuilder(cleanedData);
-            
+
             // Print mapping data
             this.dataMaps = await this.generateDataMaps(this.encodeMaps);
 
-            // Encode data
-            const encodedData = await this.encodeField(cleanedData);
-            const encodedOutput = await this.encodeOutput(cleanedData)
+            // clean newstudent
+            const cleanedData2 = await this.cleanNewStudent(cleanedData);
 
-            // Split for testing
-            const {dataTest, outputTest, dataTrain, outputTrain} = await this.splitData(encodedData, encodedOutput)
+            // find output
+            this.totalDataStep.findOutput = {};
+            const dataWithOutput = await this.findOutput(cleanedData2);
+
+            // split for testing
+            this.totalDataStep.splitForTesting = {};
+            const {trainData, testData} = await this.smartSplit(dataWithOutput, 0.05);
+            this.testingData = Object.freeze(testData);
+
+            // Encode data
+            const encodedData = await this.encodeField(trainData);
+            this.totalDataStep.encodeField = {};
+            this.totalDataStep.encodeField.after = encodedData.length;
+            this.totalDataStep.encodeField.features = this.getTotalFeature(encodedData);
+            const encodedOutput = await this.encodeOutput(trainData);
 
             // Create Tensor
-            const tensorData = Object.freeze(tf.tensor2d(dataTrain, [dataTrain.length, dataTrain[0].length]));
-            const tensorOutput = Object.freeze(tf.tensor2d(outputTrain, [outputTrain.length, outputTrain[0].length]));
+            const tensorData = Object.freeze(tf.tensor2d(encodedData, [encodedData.length, encodedData[0].length]));
+            const tensorOutput = Object.freeze(tf.tensor2d(encodedOutput, [encodedOutput.length, encodedOutput[0].length]));
             this.tensorData = tensorData;
             this.tensorOutput = tensorOutput;
 
             // Creating Model
             const inputSize = tensorData.shape[1];
-            if(!this.model){
-                this.model = await this.createModel(inputSize, learningCurve, neuron, sumHidden)
-            }
-
+            this.model = await this.createModel(inputSize, learningCurve, neuron, sumHidden)
+            
             // Training Model
             store.loading.content = `Training Model`;
             const startTime = Date.now();
@@ -127,44 +136,9 @@ export const MModelStore = defineStore('mmodelStore', {
             const trainingTime = (endTime - startTime) / 1000;
             console.log(`Training ${trainingTime.toFixed(2)} detik`);
 
-            store.loading.content = `Predicting Testing Data`;
-            // Pastikan dataTest adalah tensor2d
-            const tensorTest = tf.tensor2d(dataTest, [dataTest.length, dataTest[0].length]);
-            
-            // Testing
-            const outputPredict = toRaw(this.model).predict(tensorTest);
-
-            // Konversi hasil prediksi dan label
-            const preds = await outputPredict.data();
-            
-            // Save testing labels
-            this.testingSummary.real = outputTest.map(l => l[0]);
-            this.testingSummary.pred = preds;
-            
-            // // Hitung akurasi manual
-            // let TP = 0, FP = 0, FN = 0, TN = 0;
-            // for (let i = 0; i < preds.length; i++) {
-            //     const pred = preds[i][0];
-            //     const label = labels[i];
-
-            //     if (pred === 1 && label === 1) TP++; // True Positive
-            //     else if (pred === 1 && label === 0) FP++; // False Positive
-            //     else if (pred === 0 && label === 1) FN++; // False Negative
-            //     else if (pred === 0 && label === 0) TN++; // True Negative
-            // }
-
-            // const accuracy = (TP + TN) / (TP + FP + TN + FN || 1);
-            // const precision = TP / (TP + FP || 1);
-            // const recall = TP / (TP + FN || 1);
-
-            // // Log hasil
-            // console.log("Predictions (rounded):", preds.map(p => p[0]));
-            // console.log("True Labels         :", labels);
-            // console.log(`Manual Accuracy: ${(accuracy * 100).toFixed(2)}%`);
-            // console.log(`Precision       : ${(precision * 100).toFixed(2)}%`);
-            // console.log(`Recall          : ${(recall * 100).toFixed(2)}%`);
-
-            store.loading.status = true;
+            // Testing Model
+            await this.testModel();
+            this.isTrained = true;
         },
         async saveConfig(){
             const store = MainStore();
@@ -185,6 +159,23 @@ export const MModelStore = defineStore('mmodelStore', {
 
             this.rancuDuration = store.getRancuDuration;
             this.timeNow = store.getTimeNow;
+        },
+        async loadModel() {
+            // Config backend tensorflow
+            await tf.setBackend('webgpu');
+            await tf.ready();
+            let model;
+            try { 
+                model = await tf.loadLayersModel('indexeddb://best-model-val_loss');
+                this.model = model;
+                console.log('✅ Model loaded from disk!');
+                this.modelAvailable = true;
+            } catch (err) {
+                console.log('⚠️ Model not found ');
+                console.log(err);
+            }
+
+            return model;
         },
         async completingMissingData(){
             const store = MainStore();
@@ -252,33 +243,15 @@ export const MModelStore = defineStore('mmodelStore', {
             this.totalDataStep.cleanOutliers.filteredByStatus.deleted = this.totalDataStep.cleanOutliers.fullData.after - filteredByStatus.length;
             this.totalDataStep.cleanOutliers.filteredByStatus.features = this.getTotalFeature(filteredByStatus);
 
-            // Handle newStudents
-            this.totalDataStep.cleanOutliers.validStudents = {};
-            const validStudents = filteredByStatus.filter(s => {
-                const status = s.statusMahasiswa?.trim().toLowerCase();
-                const duration = parseFloat(s.durasi);
-
-                const isLulus = this.status.lulus.some(v => status.includes(v));
-                const isDikeluarkan = this.status.dikeluarkan.some(v => status.includes(v));
-                const isKeluar = this.status.keluar.some(v => status.includes(v));
-                const isAktif = this.status.aktif.some(v => status.includes(v));
-
-                const filter = isLulus || isDikeluarkan || isKeluar || (isAktif && duration >= 4);
-
-                return filter;
-            });
-            this.totalDataStep.cleanOutliers.validStudents.after = validStudents.length;
-            this.totalDataStep.cleanOutliers.validStudents.deleted = this.totalDataStep.cleanOutliers.filteredByStatus.after - validStudents.length;
-            this.totalDataStep.cleanOutliers.validStudents.features = this.getTotalFeature(validStudents);
-
             // Handle outliers
-            const ipkList = validStudents
+            const helper = HelperCode();
+            const ipkList = filteredByStatus
                 .map(s => parseFloat(s[this.inputConfig.number]))
                 .filter(Number.isFinite);
             
             const sortedIPK = [...ipkList].sort((a, b) => a- b);
-            const q1 = await this.percentile(sortedIPK, 0.015);
-            const q3 = await this.percentile(sortedIPK, 1.00);
+            const q1 = await helper.percentile(sortedIPK, 0.015);
+            const q3 = await helper.percentile(sortedIPK, 1.00);
             // const iqr = q3 - q1;
             // console.log("Q1:", q1, "Q3:", q3, "IQR:", iqr);
 
@@ -295,19 +268,119 @@ export const MModelStore = defineStore('mmodelStore', {
             //     }
             // })
             this.totalDataStep.cleanOutliers.filterIPK = {};
-            const filterIPK = validStudents.filter(s => {
+            const filterIPK = filteredByStatus.filter(s => {
                 const ipk = parseFloat(s[this.inputConfig.number]);
                 if(ipk >= q1 && ipk <= q3){
                     return ipk
                 }
             })
             this.totalDataStep.cleanOutliers.filterIPK.after = filterIPK.length;
-            this.totalDataStep.cleanOutliers.filterIPK.deleted = this.totalDataStep.cleanOutliers.validStudents.after - filterIPK.length;
+            this.totalDataStep.cleanOutliers.filterIPK.deleted = this.totalDataStep.cleanOutliers.filteredByStatus.after - filterIPK.length; //error .after disini
             this.totalDataStep.cleanOutliers.filterIPK.features = this.getTotalFeature(filterIPK);
 
             return filterIPK;
         },
+        async cleanNewStudent(data){
+            // Handle newStudents
+            this.totalDataStep.cleanOutliers.validStudents = {};
+            const validStudents = data.filter(s => {
+                const status = s.statusMahasiswa?.trim().toLowerCase();
+                const duration = parseFloat(s.durasi);
+
+                const isLulus = this.status.lulus.some(v => status.includes(v));
+                const isDikeluarkan = this.status.dikeluarkan.some(v => status.includes(v));
+                const isKeluar = this.status.keluar.some(v => status.includes(v));
+                const isAktif = this.status.aktif.some(v => status.includes(v));
+
+                const filter = isLulus || isDikeluarkan || isKeluar || (isAktif && duration >= 4);
+                return filter;
+            });
+            this.totalDataStep.cleanOutliers.validStudents.after = validStudents.length;
+            this.totalDataStep.cleanOutliers.validStudents.deleted = this.totalDataStep.cleanOutliers.filterIPK.after - validStudents.length;
+            this.totalDataStep.cleanOutliers.validStudents.features = this.getTotalFeature(validStudents);
+
+            return validStudents;
+        },
+        async findOutput(data){
+            for (const student of data){
+                const status = student.statusMahasiswa?.toLowerCase().trim();
+                const duration = parseFloat(student.durasi);
+                const isLulus = this.status.lulus.some(v => status.includes(v));
+                
+                student.label = (isLulus && duration <= 4) ? 1 : 0;
+            }
+            this.totalDataStep.findOutput.features = this.getTotalFeature(data);
+            return data;
+        },
+        async smartSplit(data, splitRatio = 0.05){
+            const oneHot = this.inputConfig.oneHot || {};
+            const mapping = this.inputConfig.mapping || {};
+            const nTest = Math.max(1, Math.round(data.length * splitRatio));
+
+            const comboMap = {};
+            for (const student of data){
+                const key = oneHot.map(field => {
+                    let val = student[field]?.toLowerCase().replace(/\s*-\s*/g, '-').trim();
+                    const fieldMapping = mapping[field];
+                    if (fieldMapping && fieldMapping[val] && val){
+                        val = fieldMapping[val];
+                    }
+                    return val || '';
+                }).join('|');
+                if (!comboMap[key]) comboMap[key] = [];
+                comboMap[key].push(student);
+            }
+            // Sort
+            const sortedEntries = Object.entries(comboMap).sort((a, b) => b[1].length - a[1].length);
+            const sorted = Object.fromEntries(sortedEntries)
+
+            const testUniq = [];
+            const used = new Set();
+            for (const arr of Object.values(sorted)) {
+                if (arr.length > 10 && testUniq.length < nTest) {
+                    const idx = Math.floor(Math.random() * arr.length);
+                    testUniq.push(arr[idx]);
+                    used.add(arr[idx]);
+                }
+            }
+
+            // returning used test to data
+            const leftover = data.filter(row => !used.has(row));
+            for (let i = leftover.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [leftover[i], leftover[j]] = [leftover[j], leftover[i]];
+            }
+            const testSet = testUniq.slice();
+            for (let i = 0; i < leftover.length && testSet.length < nTest; i++) {
+                testSet.push(leftover[i]);
+            }
+
+            // 4. Data train = data - testSet
+            const testSetSet = new Set(testSet);
+            const trainData = data.filter(row => !testSetSet.has(row));
+            const testData = testSet;
+            this.totalDataStep.splitForTesting.after = trainData.length;
+            this.totalDataStep.splitForTesting.features = this.getTotalFeature(trainData);
+
+            return { trainData, testData };
+        },
+        async loadEncodeMaps(){
+            console.log("loadEncodeMaps")
+            try {
+                const maps = await get('encode-maps');
+                if (maps) {
+                    this.encodeMaps = maps;
+                    console.log("✅ encodeMaps loaded from IndexedDB");
+                } else {
+                    console.warn("⚠️ encodeMaps not found in IndexedDB");
+                }
+            } catch (err) {
+                console.warn("❌ Error loading encodeMaps");
+                console.error(err);
+            }
+        },
         async encodeMapsbuilder(dataList){
+            // Pembuatan encodeMaps
             const encodeMaps = {};
 
             // Encode one-hot
@@ -337,29 +410,63 @@ export const MModelStore = defineStore('mmodelStore', {
                     max: Math.max(...val),
                 }
             }
-
+            const rawEncodeMaps = toRaw(encodeMaps)
+            await set('encode-maps', rawEncodeMaps)
             return encodeMaps;
         },
         async encodeField(data){
             const encoded = [];
-            this.totalDataStep.encodeField = {};
+            let debugging = {};
             for (const student of data){
                 const row = [];
                 
                 // Encode one-hot
-                for (const field of this.inputConfig.oneHot){
+                // for (const field of this.inputConfig.oneHot){
+                //     const fieldMap = this.encodeMaps[field];
+                //     const oneHot = new Array(fieldMap.size).fill(0); 
+                //     let val = student[field]?.toLowerCase().replace(/\s*-\s*/g, '-').trim();
+                //     if (!val) {
+                //         console.log(`Field ${field} is empty for student`, student);
+                //         continue;
+                //     }
+
+                //     const fieldMapping = this.inputConfig.mapping?.[field];
+                //     if (fieldMapping && fieldMapping[val]){
+                //         val = fieldMapping[val];
+                //     }
+                //     const index = fieldMap.map.get(val);
+                //     if (index !== undefined){
+                //         oneHot[index] = 1;
+                //     }
+                //     row.push(...oneHot);
+                // }
+                for (const field of this.inputConfig.oneHot) {
                     const fieldMap = this.encodeMaps[field];
-                    const oneHot = new Array(fieldMap.size).fill(0);
+                    const oneHot = new Array(fieldMap.size).fill(0); 
+
                     let val = student[field]?.toLowerCase().replace(/\s*-\s*/g, '-').trim();
-                    if (!val) continue;
+
+                    if (!val) {
+                        console.warn(`⚠️ Field "${field}" is empty for student:`, student);
+                        continue;
+                    }
+
+                    const rawVal = val; // simpan sebelum mapping
 
                     const fieldMapping = this.inputConfig.mapping?.[field];
-                    if (fieldMapping && fieldMapping[val]){
+                    if (fieldMapping && fieldMapping[val]) {
                         val = fieldMapping[val];
                     }
+
                     const index = fieldMap.map.get(val);
-                    if (index !== undefined){
+
+                    if (index !== undefined) {
                         oneHot[index] = 1;
+                    } else {
+                        if (!debugging[val]){
+                            debugging[val] = [];
+                        }
+                        debugging[val].push(`${rawVal} pada ${val}`);                    
                     }
                     row.push(...oneHot);
                 }
@@ -376,51 +483,49 @@ export const MModelStore = defineStore('mmodelStore', {
                 }
                 encoded.push(row);
             }
-            this.totalDataStep.encodeField.after = encoded.length;
-            this.totalDataStep.encodeField.features = this.getTotalFeature(encoded);
+            console.log("debugging:", debugging)
+
             return encoded;
         },
         async encodeOutput(data){
             let banyak1 = 0;
             let banyak0 = 0;
             const encoded = data.map(s => {
-                const status = s.statusMahasiswa?.toLowerCase().trim();
-                const duration = parseFloat(s.durasi)
-                const isLulus = this.status.lulus.some(v => status.includes(v));
-                if (isLulus && duration <=4) banyak1++;
+                if (s.label === 1) banyak1++;
                 else banyak0++
-                return (isLulus && duration <= 4) ? 1 : 0;
+                return s.label;
             })
             console.log(`1 VS 0 : ${banyak1} vs ${banyak0}`);
             return encoded.map(v => [v]);
         },
-        async splitData(data, output){
-            // Combine input-Output
-            const combined = data.map((input, idData) => ({
-                input,
-                output: output[idData]
-            }))
+        // async splitData(data, output){
+        //     // Combine input-Output
+        //     const combined = data.map((input, idData) => ({
+        //         input,
+        //         output: output[idData]
+        //     }))
 
-            // Shuffle
-            for (let i = combined.length - 1; i > 0; i--){
-                const j = Math.floor(Math.random() * (i + 1));
-                [combined[i], combined[j]] = [combined[j], combined[i]];
-            }
+        //     // Shuffle
+        //     for (let i = combined.length - 1; i > 0; i--){
+        //         const j = Math.floor(Math.random() * (i + 1));
+        //         [combined[i], combined[j]] = [combined[j], combined[i]];
+        //     }
 
-            // 5% for Testing
-            const testSize = Math.floor(combined.length * 0.05);
-            const testSet = combined.slice(0, testSize);
-            const trainSet = combined.slice(testSize);
+        //     // 5% for Testing
+        //     const testSize = Math.floor(combined.length * 0.05);
+        //     const testSet = combined.slice(0, testSize);
+        //     const trainSet = combined.slice(testSize);
 
-            // Split
-            const dataTest = testSet.map(d => d.input);
-            const outputTest = testSet.map(d => d.output);
-            const dataTrain = trainSet.map(d => d.input);
-            const outputTrain = trainSet.map(d => d.output);
+        //     // Split
+        //     const dataTest = testSet.map(d => d.input);
+        //     const outputTest = testSet.map(d => d.output);
+        //     const dataTrain = trainSet.map(d => d.input);
+        //     const outputTrain = trainSet.map(d => d.output);
 
-            return {dataTest, outputTest, dataTrain, outputTrain}
-        },
+        //     return {dataTest, outputTest, dataTrain, outputTrain}
+        // },
         async createModel(inputSize, learningCurve, neuron, sumHidden){
+            console.log("inputSize:", inputSize)
             const model = tf.sequential();
             await tf.ready();
 
@@ -485,14 +590,14 @@ export const MModelStore = defineStore('mmodelStore', {
             let bestValLoss = Infinity;
             const modelCheckpointCallBack = {
                 onEpochEnd: async (epoch, logs) => {
-                    const valLoss = logs.val_loss;
+                const valLoss = logs.val_loss;
 
-                    if(valLoss < bestValLoss){
-                        bestValLoss = valLoss;
-                        console.log(`✨ Epoch ${epoch + 1}: val_loss improved to ${valLoss.toFixed(4)}. Saving model...`);
+                if(valLoss < bestValLoss){
+                    bestValLoss = valLoss;
+                    console.log(`✨ Epoch ${epoch + 1}: val_loss improved to ${valLoss.toFixed(4)}. Saving model...`);
 
-                        await model.save('indexeddb://best-model-val_loss');
-                    }
+                    await model.save('indexeddb://best-model-val_loss');
+                }
                 }
             }
             const modelCheckpoint = new tf.CustomCallback(modelCheckpointCallBack);
@@ -512,24 +617,24 @@ export const MModelStore = defineStore('mmodelStore', {
 
             const reduceLROnPlateauCallback = {
                 onEpochEnd: async (epoch, logs) => {
-                    const valLoss = logs.val_loss;
+                const valLoss = logs.val_loss;
 
-                    if (valLoss + reduceLROnPlateauConfig.minDelta < bestValLossPlateau) {
-                        bestValLossPlateau = valLoss;
+                if (valLoss + reduceLROnPlateauConfig.minDelta < bestValLossPlateau) {
+                    bestValLossPlateau = valLoss;
+                    wait = 0;
+                } else {
+                    wait++;
+                    if (wait >= reduceLROnPlateauConfig.patience) {
+                        const oldLR = currentLR;
+                        currentLR = Math.max(oldLR * reduceLROnPlateauConfig.factor, reduceLROnPlateauConfig.minLR);
+                        console.log(`📉 [Epoch ${epoch + 1}] val_loss stagnan selama ${wait} epoch`);
+
+                        console.log(`🔽 ReduceLROnPlateau: Menurunkan learning rate dari ${oldLR} ke ${currentLR}`);
+                        
+                        model.optimizer.learningRate = currentLR;
                         wait = 0;
-                    } else {
-                        wait++;
-                        if (wait >= reduceLROnPlateauConfig.patience) {
-                            const oldLR = currentLR;
-                            currentLR = Math.max(oldLR * reduceLROnPlateauConfig.factor, reduceLROnPlateauConfig.minLR);
-                            console.log(`📉 [Epoch ${epoch + 1}] val_loss stagnan selama ${wait} epoch`);
-
-                            console.log(`🔽 ReduceLROnPlateau: Menurunkan learning rate dari ${oldLR} ke ${currentLR}`);
-                            
-                            model.optimizer.learningRate = currentLR;
-                            wait = 0;
-                        }
                     }
+                }
                 }
             };
             const reduceLROnPlateau = new tf.CustomCallback(reduceLROnPlateauCallback);
@@ -566,16 +671,77 @@ export const MModelStore = defineStore('mmodelStore', {
 
             this.model = await tf.loadLayersModel('indexeddb://best-model-val_loss');
         },
-        // Helper Section
-        async percentile(arrData, p){
-            const index = (arrData.length - 1) * p;
-            const lower = Math.floor(index);
-            const upper = Math.ceil(index);
-            const weight = index % 1;
+        async testModel(columnToShuffle = null){
+            if(!this.model){
+                console.error("Model belum dibuat. Silakan jalankan startInitial terlebih dahulu.");
+                return;
+            }
+            // Reset testing summary
+            this.testingSummary = {};
 
-            if(upper >= arrData.length) return arrData[lower];
-            return arrData[lower] * (1-weight) +arrData[upper] * weight;
+            const store = MainStore();
+            store.loading.status = false;
+            store.loading.content = `Predicting Testing Data`;
+
+            const data = structuredClone(this.testingData);
+            if (columnToShuffle || !columnToShuffle === ""){
+                console.log(`Shuffling column: ${columnToShuffle}`);
+                const values = data.map(s => s[columnToShuffle])
+
+                // Shuffle values
+                for (let i = values.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [values[i], values[j]] = [values[j], values[i]];
+                }
+
+                // Assign shuffled values back to data
+                data.forEach((row, index) => {
+                    row[columnToShuffle] = values[index];
+                })
+            }
+
+            const encodedData = await this.encodeField(data);
+            const encodedOutput = await this.encodeField(data);
+
+            // Create Tensor for Testing
+            const tensorTestData = Object.freeze(tf.tensor2d(encodedData, [encodedData.length, encodedData[0].length]));
+
+            // Testing
+            const outputPredict = toRaw(this.model).predict(tensorTestData);
+
+            // Konversi hasil prediksi dan label
+            const preds = await outputPredict.data();
+
+            // Save testing labels
+            this.testingSummary.real = encodedOutput.map(l => l[0]);
+            this.testingSummary.pred = preds;
+
+            store.loading.status = true;
+
         },
+        async predictData(data){
+            let model = toRaw(this.model);
+            if(!this.modelAvailable || !model){
+                const store = MainStore();
+                store.loading.content = "❌ Model tidak tersedia!";
+                console.warn("Model tidak tersedia untuk prediksi.");
+                return null;
+            }
+            await this.saveConfig();
+            if(!this.encodeMaps || Object.keys(toRaw(this.encodeMaps)).length === 0){
+                await this.loadEncodeMaps() 
+                if(!this.encodeMaps || Object.keys(toRaw(this.encodeMaps)).length === 0){
+                    console.warn("EncodeMaps tidak ditemukan")
+                    return null;
+                }
+            }
+            const encodedData = await this.encodeField(data);
+            const tensorData = Object.freeze(tf.tensor2d(encodedData, [encodedData.length, encodedData[0].length]));
+            const outputPredict = model.predict(tensorData);
+            const preds = await outputPredict.data();
+            return preds;
+        },
+        // Helper Section
         async generateDataMaps(encodeMaps){
             const table = {};
 

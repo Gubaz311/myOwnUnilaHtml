@@ -81,35 +81,68 @@
             </div>
         </div>
     </div>
-
+    <input
+        ref="fileInput"
+        type="file"
+        accept=".csv"
+        class="hidden"
+        @change="handleFileUpload"
+    /> 
 </template>
 
 <script setup>
-import { ref, computed, onBeforeMount, onMounted } from 'vue';
 import { MainStore } from '@/stores/mainStore';
-const store = MainStore();
+import { computed, nextTick, onMounted, ref } from 'vue';
+import Papa from 'papaparse';
 
-// let ps = ref('4131')
+const store = MainStore();
 let ps = ref('5061')
 let year = ref('2018-2023')
 
 let splitedYear = computed(() => year.value.split("-"));
 
-
-
 const handleChange = () => {
-    store.setData(ps.value, splitedYear.value);
+    store.setDataCSV(ps.value, splitedYear.value);
 }
 
-onMounted(() => {
-    window.csv = () => {
-        store.loading.status = false;
-        store.currentView = 'csv';
-    }
-})
+function handleFileUpload(e){
+    const file = e.target.files[0];
+    if (!file) return;
 
-onBeforeMount(() => {
-    store.setData(ps.value, splitedYear.value)
-})
+    Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+            store.loading.content = `Parsing CSV file`;
+            store.loading.status = false; //membuat menjadi loading
+            parsedData.value = results.data;
+            store.setDataCSV(ps.value, splitedYear.value, parsedData.value)
+                .finally(() => {
+                store.loading.status = true; // pastikan loading selesai
+                });
+        },
+        error: (error) => {
+            console.error("Error parsing CSV file:", error);
+            return;
+        }
+    })
+}
+
+function triggerFileInput() {
+  fileInput.value?.click()
+}
+
+const fileInput = ref(null);
+const parsedData = ref([]);
+
+
+onMounted(() => {
+store.loading.status = false;   //membuat menjadi loading
+  nextTick(() => {
+    store.loading.content = `Parsing CSV file`;
+    triggerFileInput();
+  });
+});
+
 
 </script>

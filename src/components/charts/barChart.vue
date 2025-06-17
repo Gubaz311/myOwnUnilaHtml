@@ -9,7 +9,8 @@
   const props = defineProps({
     title: String,
     categories: Array,
-    series: Array
+    series: Array,
+    stacking: String,
   })
   
   const chartContainer = ref(null)
@@ -27,6 +28,12 @@
       chart: {
         type: 'column',
         backgroundColor: null
+      },
+      plotOptions:{
+        column: {
+          stacking: props.stacking || undefined,
+          groupPadding: 0.2
+        },
       },
       title: {
         text: props.title || null,

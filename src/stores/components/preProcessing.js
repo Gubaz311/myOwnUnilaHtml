@@ -11,18 +11,30 @@ export const PreProcessing = defineStore("preProcessing", {
     getters:{
     },
     actions:{
-      async getSemesterNumber(str) {
-        const year = parseInt(str);
-        const isGenap = str.toLowerCase().includes("genap");
-        return (year - 2000) * 2 + (isGenap ? 1 : 0);
-      },
-      async roundToNearestHalf(num) {
-        return Math.round(num * 2) / 2;
-      },
       async startPreprocessing(data){
+        async function extractInfo(studentsArr){
+          function getSemesterNumber(str){
+              const year = parseInt(str);
+              const isGenap = str.toLowerCase().includes("genap");
+              return (year - 2000) * 2 + (isGenap ? 1 : 0);
+          };
+
+          function roundToNearestHalf(num) {
+              return Math.round(num * 2) / 2;
+          };
+
+          for (const student of studentsArr) {
+          const semesterAwal = getSemesterNumber(student.angkatan);
+          const semesterAkhir = getSemesterNumber(student.semesterTerakhir);
+          const durasi = Number(roundToNearestHalf((semesterAkhir - semesterAwal)/2));
+          student.durasi = parseFloat(durasi.toFixed(1));
+          }
+          return studentsArr;
+        };
+
         const clean = await this.cleaningData(data);
-        const extractInfo = await this.extractInfo(clean);
-        const cut = await this.cutColumn(extractInfo);
+        const extractedInfo = await extractInfo(clean);
+        const cut = await this.cutColumn(extractedInfo);
         return cut;
       },
       async cleaningData(data){
@@ -74,7 +86,7 @@ export const PreProcessing = defineStore("preProcessing", {
         filledStudents.map((student) => {
           if (!student.angkatan){
             const npm = student.npm
-            const angkatanCode = npm.slic(0,2);
+            const angkatanCode = npm.slice(0,2);
             if (parseInt(angkatanCode)<10){
               student.angkatan = `200${angkatanCode}`;
             }else{
@@ -97,16 +109,12 @@ export const PreProcessing = defineStore("preProcessing", {
             student.jalurPenerimaan = jalurMap[student.kodeProdi] || "tidak diketahui";
           }
         });
-        return filledStudents;
-      },
-      async extractInfo(data){
-        for (const student of data) {
-          const semesterAwal = await this.getSemesterNumber(student.angkatan);
-          const semesterAkhir = await this.getSemesterNumber(student.semesterTerakhir);
-          const durasi = Number(await this.roundToNearestHalf((semesterAkhir - semesterAwal)/2));
-          student.durasi = parseFloat(durasi.toFixed(1));
-        }
-        return data;
+
+        const outRangeIpk = filledStudents.filter((student) => {
+          const ipk = parseFloat(student.ipk);
+          return ipk >= 0.00 && ipk <= 4.00;
+        })
+        return outRangeIpk;
       },
       async cutColumn(data){
         const columnsToCut = this.columnsToCut.split(",");

@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { MainStore } from "../mainStore";
+import { HelperCode } from "../helperCode";
 export const extractInfo = defineStore("extractInfo", {
   state: () => ({
     dataFlaten: [],
@@ -16,65 +17,11 @@ export const extractInfo = defineStore("extractInfo", {
     },
   },
   actions: {
-    async classifyKTW(studentsArray){
-      const store = MainStore();
-      const statusConfig = store.getStatus;
-      const currentYears = store.getTimeNow;
-      const tressholdYears = currentYears-4;
-
-      const lulusStatus = (statusConfig.lulus || 'lulus').split(",").map(s=>s.trim().toLowerCase());
-      const doStatus     = (statusConfig.dikeluarkan || 'do').split(',').map(s => s.trim().toLowerCase());
-      const aktifStatus  = (statusConfig.aktif || 'aktif').split(',').map(s => s.trim().toLowerCase());
-      const keluarStatus = (statusConfig.keluar || 'keluar').split(',').map(s => s.trim().toLowerCase());
-
-      let tepatWaktu = 0;
-      let tidakTepatWaktu= 0;
-      for (const student of studentsArray){
-        const status = student.statusMahasiswa?.trim().toLowerCase();
-        const duration = parseFloat(student.durasi);
-        const angkatan = parseInt(student.angkatan);
-        
-        // Graduated
-        if(lulusStatus.includes(status)){
-          if(duration <= 4) tepatWaktu++;
-          else              tidakTepatWaktu++;
-        }
-        // Kicked out
-        else if (doStatus.includes(status)){
-          if (duration >= 2) tidakTepatWaktu++;
-        }
-        // Resigned
-        else if (keluarStatus.includes(status)){
-          if (duration > 6) tidakTepatWaktu++;
-        }
-        // Active
-        else if (aktifStatus.includes(status)){
-          if (angkatan < tressholdYears) tidakTepatWaktu++;
-        }
-      }
-      return {
-        tepatWaktu,
-        tidakTepatWaktu,
-      };
-    },
-    async flattenData(data, p) {
-      if(p ==="all"){
-        return Object.values(data) 
-        .flatMap(prodiObj =>
-          Object.values(prodiObj) 
-            .flatMap(angkatanObj =>
-              Object.values(angkatanObj) 
-                .flat() 
-            )
-        );
-      }else{
-        return Object.values(data).flat();
-      }
-    },       
     async startExtracting(data, p) {
+      const helper = HelperCode();
       this.dataFlaten = {};
       this.extractedData = {};
-      this.dataFlaten = await this.flattenData(data, p);
+      this.dataFlaten = await helper.flattenData(data, p);
       await Promise.resolve();
       this.extractedData.totalData = await this.totalData();
       const bestCounts = await this.countBest(); 
@@ -194,7 +141,7 @@ export const extractInfo = defineStore("extractInfo", {
             }
           }
           const avgGPA = countGPA ? (sumGPA/countGPA).toFixed(2) : "0.00";
-          const avgDur = countGPA ? (sumDur/countDur).toFixed(1) : "0.0";
+          const avgDur = countDur ? (sumDur/countDur).toFixed(1) : "0.0";
 
           if(totalAll > 0){
             result[fakultas] ={
@@ -234,7 +181,7 @@ export const extractInfo = defineStore("extractInfo", {
           })
 
           const avgGPA = countGPA ? (sumGPA/countGPA).toFixed(2) : "0.00";
-          const avgDur = countGPA ? (sumDur/countDur).toFixed(1) : "0.0";
+          const avgDur = countDur ? (sumDur/countDur).toFixed(1) : "0.0";
 
           if(totalAll > 0){
             result[angkatan] ={
@@ -341,6 +288,7 @@ export const extractInfo = defineStore("extractInfo", {
       };
     },
     async findKTW(data, p){
+      const helper = HelperCode()
       const result = {};
       if(p==="all"){
         for (const [fakultas, prodiObj] of Object.entries(data)){
@@ -349,9 +297,20 @@ export const extractInfo = defineStore("extractInfo", {
 
           for (const angkatan of Object.values(prodiObj)){
             for (const students of Object.values(angkatan)){
-              const classified = await this.classifyKTW(students);
-              tepatWaktu += classified.tepatWaktu;
-              tidakTepatWaktu += classified.tidakTepatWaktu;
+              for (const student of students){
+                const label = parseInt(student.label);
+                if (isNaN(label)){
+                  const hasil = await helper.classifyKTW(student);
+                  tepatWaktu += hasil.tepatWaktu;
+                  tidakTepatWaktu += hasil.tidakTepatWaktu;
+                } else{
+                  if (label === 1){
+                    tepatWaktu += 1;
+                  }else if (label === 0){
+                    tidakTepatWaktu += 1;
+                  }
+                }
+              }
             }
           }
           if (tepatWaktu|| tidakTepatWaktu){
@@ -362,13 +321,24 @@ export const extractInfo = defineStore("extractInfo", {
           }
         }
       }else{
-        for (const[angkatan, mahasiswa] of Object.entries(data)){
+        for (const[angkatan, students] of Object.entries(data)){
           let tepatWaktu = 0;
           let tidakTepatWaktu = 0;
 
-          const classified = await this.classifyKTW(mahasiswa)
-          tepatWaktu += classified.tepatWaktu;
-          tidakTepatWaktu += classified.tidakTepatWaktu;
+          for (const student of students){
+            const label = parseInt(student.label);
+            if (isNaN(label)){
+              const hasil = await helper.classifyKTW(student);
+              tepatWaktu += hasil.tepatWaktu;
+              tidakTepatWaktu += hasil.tidakTepatWaktu;
+            } else{
+              if (label === 1){
+                tepatWaktu += 1;
+              }else if (label === 0){
+                tidakTepatWaktu += 1;
+              }
+            }
+          }
 
           if (tepatWaktu || tidakTepatWaktu){
             result[angkatan]={
@@ -378,6 +348,7 @@ export const extractInfo = defineStore("extractInfo", {
           }
         }
       }
+
       return result
     },
   },

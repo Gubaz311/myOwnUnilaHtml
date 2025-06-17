@@ -56,15 +56,11 @@
   disabled: Boolean
   })
 
-  // import { ModelStore } from '@/stores/components/modelStore'
-  // const model = ModelStore()
-
-
   const backend = ref('webgpu')
-  const patience = ref(50)
-  const learningRate = ref(0.005)
-  const neurons = ref('64,32,16')
-  const hiddenSum = ref('3')
+  const patience = ref(1)
+  const learningRate = ref(0.5)
+  const neurons = ref('1')
+  const hiddenSum = ref('1')
 
   const splitedNeurons = computed(() =>
     neurons.value.split(",").map(n => parseInt(n.trim()))

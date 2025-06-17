@@ -3,12 +3,13 @@
     <main class="bg-lightMain dark:bg-darkMain relative min-h-screen pb-5">
     <noiseBackground/>
     <MainHeader class="overflow-hidden z-30"/>
-    <OptionButton v-if="store.currentView !== 'report'"/>
+    <OptionButton v-if="store.currentView === 'ktw'"/>
+    <optionButtonCSV v-if="store.currentView === 'csv'"/>
     <div v-if="store.loading.status === true">
       <component :is="currentCoponnent"/>
     </div>
     <div v-else>
-      <LoadingView v-if="store.loading.status === false"/>
+      <LoadingView/> 
     </div>
     <optionAI v-if="store.currentView === 'report'" :disabled="!store.loading.status"/>
   </main>
@@ -24,15 +25,26 @@ import ktwView from './views/ktwView.vue';
 import { MainStore } from './stores/mainStore';
 import LoadingView from './components/loadingView.vue';
 import OptionButton from './components/optionButton.vue';
-import { computed } from 'vue';
+import optionButtonCSV from './components/optionButtonCSV.vue';
+import { computed, onMounted } from 'vue';
 import ReportModel from './views/reportModel.vue';
 import optionAI from './components/optionAI.vue';
+import csvView from './views/csvView.vue';
+import { MModelStore } from './stores/components/mmodelStore';
 const store = MainStore();
 
 
 const currentCoponnent = computed(() =>{
-  return store.currentView === 'report' ? ReportModel : ktwView;
+  if (store.currentView === 'report') return ReportModel;
+  else if (store.currentView === 'ktw') return ktwView;
+  else return csvView; 
 })
 
+onMounted(async () => {
+  const model = MModelStore();
+  if (!model.modelAvailable) {
+    await model.loadModel();
+  }
+});
 </script>
 
