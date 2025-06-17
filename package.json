@@ -19,7 +19,10 @@
     "dotenv": "^16.4.5",
     "highcharts": "^12.2.0",
     "highcharts-vue": "^2.0.1",
+    "idb-keyval": "^6.2.2",
     "jszip": "^3.10.1",
+    "lodash": "^4.17.21",
+    "papaparse": "^5.5.3",
     "pinia": "^2.2.4",
     "vue": "^3.5.12",
     "vue-router": "^4.4.5"
